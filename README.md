@@ -1,2 +1,2 @@
-# Fib2048
-2048, but fibonacci
+# 2048 with Fragile Tiles
+2048, but the tiles disappear
