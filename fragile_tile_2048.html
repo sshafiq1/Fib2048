@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fragile 2048</title>
+<link href="https://fonts.googleapis.com/css2?family=Clear+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #faf8ef;
+    color: #776e65;
+    font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: clamp(3rem, 10vw, 5rem);
+    font-weight: 700;
+    color: #776e65;
+    line-height: 1;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: #776e65;
+    margin-top: 4px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .title-group { flex: 1; }
+
+  .scores {
+    display: flex;
+    gap: 8px;
+  }
+
+  .score-box {
+    background: #bbada0;
+    border-radius: 3px;
+    padding: 8px 16px;
+    text-align: center;
+    min-width: 72px;
+  }
+
+  .score-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #eee4da;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .score-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 8px;
+  }
+
+  .btn {
+    background: #8f7a66;
+    border: none;
+    color: #f9f6f2;
+    font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .btn:hover { background: #7a6657; }
+
+  .durability-info {
+    font-size: 0.7rem;
+    color: #bbada0;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    background: #bbada0;
+    border-radius: 6px;
+    padding: 12px;
+    width: 100%;
+    max-width: 480px;
+    aspect-ratio: 1;
+  }
+
+  .cell {
+    background: rgba(238, 228, 218, 0.35);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 0;
+  }
+
+  .cell-value {
+    font-size: clamp(1.2rem, 5vw, 2.2rem);
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .cell-dur {
+    font-size: clamp(0.45rem, 1.5vw, 0.65rem);
+    font-weight: 700;
+    opacity: 0.75;
+    margin-top: 3px;
+    letter-spacing: 1px;
+  }
+
+  .durability-bar {
+    position: absolute;
+    bottom: 5px;
+    left: 7px;
+    right: 7px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+
+  .durability-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s, background 0.3s;
+  }
+
+  .cell.new { animation: pop 0.2s ease; }
+  .cell.merged { animation: merge-pop 0.25s ease; }
+  .cell.cracking {
+    animation: crack 0.4s ease;
+    outline: 2px solid #f65e3b;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    80% { transform: scale(1.08); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes merge-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes crack {
+    0% { transform: scale(1); }
+    25% { transform: scale(1.05) rotate(1deg); }
+    50% { transform: scale(0.95) rotate(-1deg); }
+    75% { transform: scale(1.02) rotate(0.5deg); }
+    100% { transform: scale(1); }
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(250,248,239,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 10;
+  }
+
+  .overlay.show { display: flex; }
+
+  .overlay-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #776e65;
+  }
+
+  .overlay-score {
+    font-size: 1rem;
+    color: #776e65;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-group">
+    <h1>2048</h1>
+    <div class="subtitle">Fragile edition — tiles shatter over time</div>
+  </div>
+  <div class="scores">
+    <div class="score-box">
+      <div class="score-label">Score</div>
+      <div class="score-value" id="score">0</div>
+    </div>
+    <div class="score-box">
+      <div class="score-label">Best</div>
+      <div class="score-value" id="best">0</div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn" onclick="newGame()">↺ NEW GAME</button>
+</div>
+
+<div class="durability-info">Merged tiles shatter over time — bigger tiles survive longer ◆</div>
+
+<div id="grid"></div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-title" id="overlay-title">Game over!</div>
+  <div class="overlay-score" id="overlay-score"></div>
+  <button class="btn" onclick="newGame(); document.getElementById('overlay').classList.remove('show')" style="max-width:180px">PLAY AGAIN</button>
+</div>
+
+<script>
+const SIZE = 4;
+let board, score, best = 0, moveCount, animFrames;
+
+// board[r][c] = { value, durability, isFragile, animClass }
+// durability: moves remaining before it shatters (null = normal tile)
+
+const DUR_BY_VALUE = {
+  4: 10, 8: 11, 16: 12, 32: 13, 64: 14,
+  128: 15, 256: 16, 512: 17, 1024: 18, 2048: 19
+};
+
+function getDurability(value) {
+  return DUR_BY_VALUE[value] || 16;
+}
+
+function newGame() {
+  board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+  score = 0;
+  moveCount = 0;
+  addRandom();
+  addRandom();
+  render();
+}
+
+function addRandom() {
+  const empty = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (!board[r][c]) empty.push([r,c]);
+  if (!empty.length) return;
+  const [r,c] = empty[Math.floor(Math.random() * empty.length)];
+  board[r][c] = { value: Math.random() < 0.9 ? 2 : 4, durability: null, isFragile: false, anim: 'new' };
+}
+
+function tickDurability() {
+  let shattered = false;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const t = board[r][c];
+      if (!t || t.durability === null) continue;
+      t.durability--;
+      if (t.durability <= 0) {
+        board[r][c] = null;
+        shattered = true;
+      } else if (t.durability === 1) {
+        t.anim = 'cracking';
+      }
+    }
+  }
+  return shattered;
+}
+
+function slide(arr) {
+  // returns { result, merged, changed }
+  const vals = arr.filter(Boolean);
+  const result = Array(SIZE).fill(null);
+  let i = 0, merged = false, changed = false;
+  
+  while (i < vals.length) {
+    if (i + 1 < vals.length && vals[i].value === vals[i+1].value) {
+      const newVal = vals[i].value * 2;
+      result[i] = { value: newVal, durability: getDurability(newVal), maxDurability: getDurability(newVal), isFragile: true, anim: 'merged' };
+      score += newVal;
+      merged = true;
+      i += 2;
+    } else {
+      result[i] = { ...vals[i], anim: null };
+      i++;
+    }
+  }
+  
+  // check changed
+  for (let j = 0; j < SIZE; j++) {
+    const a = arr[j], b = result[j];
+    if ((!a && b) || (a && !b) || (a && b && a.value !== b.value)) { changed = true; break; }
+  }
+  
+  return { result, merged, changed };
+}
+
+function move(dir) {
+  let anyChanged = false;
+  const newBoard = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+
+  if (dir === 'left' || dir === 'right') {
+    for (let r = 0; r < SIZE; r++) {
+      let row = board[r].slice();
+      if (dir === 'right') row.reverse();
+      const { result, changed } = slide(row);
+      if (changed) anyChanged = true;
+      if (dir === 'right') result.reverse();
+      newBoard[r] = result;
+    }
+  } else {
+    for (let c = 0; c < SIZE; c++) {
+      let col = Array.from({length: SIZE}, (_,r) => board[r][c]);
+      if (dir === 'down') col.reverse();
+      const { result, changed } = slide(col);
+      if (changed) anyChanged = true;
+      if (dir === 'down') result.reverse();
+      for (let r = 0; r < SIZE; r++) newBoard[r][c] = result[r];
+    }
+  }
+
+  if (!anyChanged) return;
+
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      board[r][c] = newBoard[r][c];
+
+  tickDurability();
+  addRandom();
+  
+  if (score > best) best = score;
+  
+  render();
+  
+  if (isGameOver()) {
+    setTimeout(() => {
+      document.getElementById('overlay-title').textContent = 'Game over!';
+      document.getElementById('overlay-score').textContent = `Final Score: ${score}`;
+      document.getElementById('overlay').classList.add('show');
+    }, 300);
+  }
+}
+
+function isGameOver() {
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (!board[r][c]) return false;
+  
+  // check possible merges
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const v = board[r][c].value;
+      if (c+1 < SIZE && board[r][c+1].value === v) return false;
+      if (r+1 < SIZE && board[r+1][c].value === v) return false;
+    }
+  }
+  return true;
+}
+
+const COLORS = {
+  2:    { bg: '#eee4da', text: '#776e65' },
+  4:    { bg: '#ede0c8', text: '#776e65' },
+  8:    { bg: '#f2b179', text: '#f9f6f2' },
+  16:   { bg: '#f59563', text: '#f9f6f2' },
+  32:   { bg: '#f67c5f', text: '#f9f6f2' },
+  64:   { bg: '#f65e3b', text: '#f9f6f2' },
+  128:  { bg: '#edcf72', text: '#f9f6f2' },
+  256:  { bg: '#edcc61', text: '#f9f6f2' },
+  512:  { bg: '#edc850', text: '#f9f6f2' },
+  1024: { bg: '#edc53f', text: '#f9f6f2' },
+  2048: { bg: '#edc22e', text: '#f9f6f2' },
+};
+
+function getColor(value) {
+  return COLORS[value] || { bg: '#3c3a32', text: '#f9f6f2' };
+}
+
+function render() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('best').textContent = best;
+  
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const t = board[r][c];
+      
+      if (t) {
+        const col = getColor(t.value);
+        cell.style.background = col.bg;
+        
+        const valEl = document.createElement('div');
+        valEl.className = 'cell-value';
+        valEl.style.color = col.text;
+        valEl.textContent = t.value;
+        cell.appendChild(valEl);
+        
+        if (t.isFragile && t.durability !== null) {
+          const durEl = document.createElement('div');
+          durEl.className = 'cell-dur';
+          durEl.style.color = col.text;
+          durEl.style.opacity = '0.6';
+          const dots = '◆'.repeat(t.durability) + '◇'.repeat(Math.max(0, t.maxDurability - t.durability));
+          durEl.textContent = dots;
+          cell.appendChild(durEl);
+          
+          // durability bar
+          const bar = document.createElement('div');
+          bar.className = 'durability-bar';
+          const fill = document.createElement('div');
+          fill.className = 'durability-fill';
+          const pct = (t.durability / t.maxDurability) * 100;
+          fill.style.width = pct + '%';
+          fill.style.background = pct > 60 ? 'rgba(0,0,0,0.25)' : pct > 30 ? '#f59563' : '#f65e3b';
+          bar.appendChild(fill);
+          cell.appendChild(bar);
+        }
+        
+        if (t.anim) {
+          cell.classList.add(t.anim);
+          t.anim = null;
+        }
+      }
+      
+      grid.appendChild(cell);
+    }
+  }
+}
+
+// Input handling
+document.addEventListener('keydown', e => {
+  const map = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
+                 a:'left', d:'right', w:'up', s:'down' };
+  const dir = map[e.key];
+  if (dir) { e.preventDefault(); move(dir); }
+});
+
+// Touch
+let tx, ty;
+document.getElementById('grid').addEventListener('touchstart', e => {
+  tx = e.touches[0].clientX;
+  ty = e.touches[0].clientY;
+}, { passive: true });
+
+document.getElementById('grid').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx;
+  const dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+  else move(dy > 0 ? 'down' : 'up');
+}, { passive: true });
+
+newGame();
+</script>
+</body>
+</html>
